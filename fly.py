@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import time
 from typing import Optional
 from sortedcontainers import SortedList
+from sortedcontainers import SortedDict
 from collections import defaultdict 
 import math
 import bullets as bul
@@ -63,12 +64,9 @@ def remove_collision(bullet, collision_schedule, current_schedule, current_index
         del collision_schedule[slot][bullet.index]
     bullet.collision_time = None
 
-def run_current_collision_schedule(N, index, collision_schedule, collisions, maxes):
-    if index not in collision_schedule:
-        return
-    
-    current_schedule = SortedList(collision_schedule[index].values())
-    del collision_schedule[index]
+def run_current_collision_schedule(N, index, collision_schedule, current_schedule, collisions, 
+                                   maxes, new_back=None):
+    current_schedule = SortedList(current_schedule.values())
 
     while len(current_schedule) > 0:
         t, right = current_schedule.pop(index=0)
@@ -94,9 +92,13 @@ def run_current_collision_schedule(N, index, collision_schedule, collisions, max
             new_right.next = new_left
             schedule_collision(bullet=new_right, collision_schedule=collision_schedule, 
                                current_schedule=current_schedule, current_index=index)
+        else:
+            new_back = new_left
         
         del right
         del left
+
+    return new_back
 
 MILLION = int(1e6)
 def run_bullet_process(N, track_collisions=False, to_time=True):
@@ -116,10 +118,12 @@ def run_bullet_process(N, track_collisions=False, to_time=True):
         if back.next is not None:
             back.next.previous = back
 
-        run_current_collision_schedule(N=N, index=index, collision_schedule=collision_schedule, 
-                                       collisions=collisions, maxes=maxes)
-        if index < N:
-            schedule_collision(bullet=back, collision_schedule=collision_schedule)
+        if index in collision_schedule:
+            current_schedule = collision_schedule[index]
+            del collision_schedule[index]
+            run_current_collision_schedule(N=N, index=index, collision_schedule=collision_schedule, 
+                current_schedule=current_schedule, collisions=collisions, maxes=maxes)
+        schedule_collision(bullet=back, collision_schedule=collision_schedule)
 
     still_alive = []
     bullet = back
@@ -128,7 +132,12 @@ def run_bullet_process(N, track_collisions=False, to_time=True):
         bullet = bullet.next
     still_alive.reverse()
 
-    
+    end_collision_schedule = SortedDict(collision_schedule)
+    new_back = back
+    while len(end_collision_schedule) > 0:
+        index, current_schedule = end_collision_schedule.popitem(index=0)
+        run_current_collision_schedule(N=N, index=index, collision_schedule=collision_schedule, 
+            current_schedule=current_schedule, collisions=collisions, maxes=maxes, new_back=new_back)
 
     if to_time:
         print('run_bullet_process: (hh:mm:ss.ms) {}'.format(time.time() - start))
@@ -144,7 +153,7 @@ def end_to_end_test():
     # fname = f"{prefix}N-{N}_seed-{seed}.json"
     # assert fname not in os.listdir(DATA_DIR)
     np.random.seed(seed)
-    back, still_alive, maxes, collisions = run_bullet_process(N=N, track_collisions=True, to_time=True)
+    back, still_alive, maxes, collisions = run_bullet_process(N=N, track_collisions=True, to_time=False)
 
     test_data = bul.load_test_data()
     test_collisions = set((col[0], col[1]) for col in test_data['collision_diagram'])
@@ -152,13 +161,13 @@ def end_to_end_test():
     still_alive_set = set((b['index'], b['speed']) for b in still_alive)
     test_still_alive_set = set((b['index'], b['speed']) for b in test_data['still_alive'])
     assert still_alive_set == test_still_alive_set
-    print(test_data['speed_data'][bul.ALIVE])
-    print(maxes[bul.ALIVE])
+
+    print(maxes)
 
     # assert data == test_data
     # data = load_data(N=N, seed=seed, prefix=prefix)
     # assert data == test_data
-    print('fly fly still noice!')
+    print('bullets_fly.py still noice!')
 
 end_to_end_test()
-# run_bullet_process(N=int(1e8))
+run_bullet_process(N=int(1e8))
