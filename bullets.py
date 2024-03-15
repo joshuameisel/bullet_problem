@@ -192,8 +192,7 @@ def update_maxes(bullet_r, bullet_l, maxes, lb_interceptor, ub_interceptor, N):
 
 def interceptors(N, survivors, still_alive):
     lb_interceptor = Bullet(index=N, speed=1)
-    num_alive_past_N = len(survivors) + len(still_alive)
-    ub_interceptor = Bullet(index=(N + num_alive_past_N - 1), speed=1)
+    ub_interceptor = Bullet(index=(N + len(still_alive) - 1), speed=1)
     return lb_interceptor, ub_interceptor
 
 def init_maxes():
@@ -291,13 +290,13 @@ def plot_cdf(data, label):
     y = np.cumsum(CDF_counts) / np.sum(CDF_counts)
     plt.plot(x,y, label=label)
 
-def experiment(N, seed=None, speeds=None, prefix='', find_collisions=False, save=True):
+def experiment(N, seed=None, speeds=None, prefix='', find_collisions=False, save=True, to_time=True):
     if seed is None:
         seed = np.random.randint(1e9)
     np.random.seed(seed)
-    bullets = run_bullet_process(N=N, speeds=speeds, to_time=True)
-    speed_data = get_front_survival_speeds(bullets=bullets, N=N, to_time=True)
-    survivors, still_alive = get_survivors(bullets=bullets, to_time=True)
+    bullets = run_bullet_process(N=N, speeds=speeds, to_time=to_time)
+    speed_data = get_front_survival_speeds(bullets=bullets, N=N, to_time=to_time)
+    survivors, still_alive = get_survivors(bullets=bullets, to_time=to_time)
     collision_diagram = None
     if find_collisions:
         collision_diagram = get_collision_diagram(bullets=bullets)
@@ -496,15 +495,14 @@ def non_eliminated_speeds_from_data(data):
     return max(lb, data[ALIVE]), max(ub, data[ALIVE])
 
 def save_test_data():
-    experiment(N=int(1e3), seed=42, prefix=TEST_PREFIX, find_collisions=True, save=True)
+    experiment(N=int(1e3), seed=TEST_SEED, prefix=TEST_PREFIX, find_collisions=True, save=True)
 
 TEST_SEED = 42
 TEST_N = int(1e3)
-def load_test_data():
-    return load_data(N=TEST_N, seed=TEST_SEED, prefix=TEST_PREFIX)
+def load_test_data(prefix=TEST_PREFIX):
+    return load_data(N=TEST_N, seed=TEST_SEED, prefix=prefix)
 
-def end_to_end_with_speeds(speeds=None):
-    seed = TEST_SEED
+def end_to_end_with_speeds(seed=TEST_SEED, speeds=None):
     N = TEST_N
     ## so filename doesn't use seed 42 after code interrupted
     np.random.seed()
@@ -512,7 +510,7 @@ def end_to_end_with_speeds(speeds=None):
     fname = f"{prefix}N-{N}_seed-{seed}.json"
     assert fname not in os.listdir(DATA_DIR)
 
-    data, bullets = experiment(N=N, seed=seed, speeds=speeds, prefix=prefix, find_collisions=True, save=True)
+    data, bullets = experiment(N=N, seed=seed, speeds=speeds, prefix=prefix, find_collisions=True, save=True, to_time=False)
     assert fname in os.listdir(DATA_DIR)
     
     sur_idxs = set(s['index'] for s in data['survivors'])
@@ -526,18 +524,24 @@ def end_to_end_with_speeds(speeds=None):
     assert speed_data[NONTHREATENED] >= speed_data[UNDOOMED_UB] >= speed_data[UNDOOMED_LB] >= speed_data[ALIVE]
 
     test_data = load_test_data()
+    assert data['seed'] == seed
+    data['seed'] = TEST_SEED
     assert data == test_data
     data = load_data(N=N, seed=seed, prefix=prefix)
+    assert data['seed'] == seed
+    data['seed'] = TEST_SEED
     assert data == test_data
-    print('noice!')
 
 def end_to_end_test():
-    end_to_end_with_speeds(speeds=None)
-
-    seed = TEST_SEED
+    start = time.time()
+    end_to_end_with_speeds(seed=TEST_SEED, speeds=None)
     N = TEST_N
     np.random.seed(TEST_SEED)
     speeds = np.random.rand(N)
-    end_to_end_with_speeds(speeds=speeds)
+    np.random.seed()
+    seed = np.random.randint(1e9)
+    end_to_end_with_speeds(seed=seed, speeds=speeds)
+
+    print('bullet.py noice!', time.time() - start)
 
 end_to_end_test()
