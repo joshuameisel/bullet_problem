@@ -187,9 +187,6 @@ def run_bullet_process(N, speeds=None, track_collisions=False, to_time=True):
     assert maxes[bul.ALIVE] <= maxes[bul.UNDOOMED_LB] <= maxes[bul.UNDOOMED_UB] <= maxes[bul.NONTHREATENED]
     if to_time:
         print('after N', time.time() - milestone, time.time() - start)
-    # milestone = time.time()
-    # if to_time:
-    #     print('run_bullet_process: (hh:mm:ss.ms) {}'.format(time.time() - start))
         
     return still_alive, maxes, survivors, collision_schedule, collisions
 
